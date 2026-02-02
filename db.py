@@ -1,24 +1,28 @@
 import sqlite3
+import os
 
-DB_NAME = "genotyping.db"
+# --------------------------------------------------
+# DB path: always inside app directory (Cloud-safe)
+# --------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "genotyping.db")
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    return sqlite3.connect(DB_PATH)
 
 def init_db():
-    import sqlite3
-
-    con = sqlite3.connect("mabs.db")
+    con = get_connection()
     cur = con.cursor()
 
-    # Existing tables (already present in your file)
+    # Upload metadata
     cur.execute("""
         CREATE TABLE IF NOT EXISTS uploads (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            label TEXT UNIQUE
+            upload_label TEXT UNIQUE
         )
     """)
 
+    # Genotyping data
     cur.execute("""
         CREATE TABLE IF NOT EXISTS genotyping (
             upload_id INTEGER,
@@ -28,9 +32,7 @@ def init_db():
         )
     """)
 
-    # --------------------------------------------------
-    # NEW TABLE: marker position reference (STEP 1)
-    # --------------------------------------------------
+    # Marker positions (optional, kept as-is)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS marker_positions (
             marker TEXT PRIMARY KEY,
@@ -46,7 +48,10 @@ def init_db():
 def add_upload(label):
     con = get_connection()
     cur = con.cursor()
-    cur.execute("INSERT OR IGNORE INTO uploads(upload_label) VALUES (?)", (label,))
+    cur.execute(
+        "INSERT OR IGNORE INTO uploads (upload_label) VALUES (?)",
+        (label,)
+    )
     con.commit()
     con.close()
 
@@ -61,7 +66,10 @@ def get_uploads():
 def get_upload_id(label):
     con = get_connection()
     cur = con.cursor()
-    cur.execute("SELECT upload_id FROM uploads WHERE upload_label=?", (label,))
+    cur.execute(
+        "SELECT id FROM uploads WHERE upload_label=?",
+        (label,)
+    )
     res = cur.fetchone()
     con.close()
     return res[0] if res else None
