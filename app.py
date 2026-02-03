@@ -132,6 +132,7 @@ with tab1:
 
         m, c = save_marker_position_file(pos_file)
 
+        st.session_state["chrom_df"] = pd.read_excel(pos_file, sheet_name=1)
         st.success(f"Marker position data uploaded: {m} markers, {c} chromosomes")
 
 
@@ -200,16 +201,27 @@ with tab2:
         )
 
     st.markdown("---")
+    
     if st.button("View Chromosome-wise Marker Map"):
 
         from analysis import get_marker_status_for_map, plot_chromosome_map
+   
+        
+        if "chrom_df" not in st.session_state:
+            st.error("Please upload chromosome map file first.")
+            st.stop()
 
         uid = get_upload_id(label)
         
         marker_status = get_marker_status_for_map(uid, rp, dp)
 
-        fig = plot_chromosome_map(marker_status, rp, dp)
-
+        fig = plot_chromosome_map(
+            marker_status,
+            rp,
+            dp,
+            st.session_state["chrom_df"]
+        )
+        
         st.pyplot(fig)
 
         import io
