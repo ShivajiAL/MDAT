@@ -126,7 +126,7 @@ with tab1:
     st.subheader("Upload Parent Genotyping Data")
 
     label = st.text_input(
-        "Upload period (e.g. Jan-2025)",
+        "Upload Group (e.g. Pair 1-15)",
         key="parent_upload_label"
     )
     file = st.file_uploader(
@@ -199,7 +199,7 @@ with tab2:
     st.subheader("RP–DP Polymorphic Marker List")
 
     label = st.selectbox(
-        "Genotyping Data Upload Period",
+        "Parent Genotype Upload Group",
         uploads,
         key="poly_upload_label"
     )
@@ -316,7 +316,7 @@ with tab3:
     st.subheader("Upload BC Genotyping Data")
 
     label = st.selectbox(
-        "Parent Genotype Upload Period",
+        "Parent Genotype Upload Group",
         uploads,
         key="bc_upload_label"
     )
@@ -370,7 +370,7 @@ with tab4:
     # INPUTS
     # ---------------------------------------------
     label = st.selectbox(
-        "Upload period",
+        "Upload Group",
         uploads,
         key="recovery_upload_label"
     )
