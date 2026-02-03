@@ -320,6 +320,23 @@ def plot_chromosome_map(marker_status_df, rp, dp):
 
     df = marker_status_df.merge(pos, on="marker", how="inner")
     df = df.merge(chr_len, on="chr", how="left")
+    
+    # --------------------------------------------------
+    # FORCE canonical chromosome naming BEFORE merge
+    # --------------------------------------------------
+    df["chr"] = df["chr"].astype(str).str.strip().str.upper()
+    chr_len["chr"] = chr_len["chr"].astype(str).str.strip().str.upper()
+
+    # OPTIONAL: zero-pad chromosome numbers (A1 -> A01)
+    import re
+    def normalize_chr(x):
+        m = re.match(r"([A-Z]+)(\d+)", x)
+        if m:
+            return f"{m.group(1)}{int(m.group(2)):02d}"
+        return x
+
+    df["chr"] = df["chr"].apply(normalize_chr)
+    chr_len["chr"] = chr_len["chr"].apply(normalize_chr)
    
     # ==================================================
     # HARD GUARD – must be here (before ANY column use)
