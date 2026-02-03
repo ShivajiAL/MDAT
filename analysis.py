@@ -309,7 +309,21 @@ def plot_chromosome_map(marker_status_df, rp, dp):
     df = df.merge(chr_len, on="chr", how="left")
 
     df["pos_mb"] = df["position_bp"] / 1e6
+
+    # --------------------------------------------------
+    # SAFETY: ensure chromosome length is usable
+    # --------------------------------------------------
+    if "chr_length_bp" not in df.columns or df["chr_length_bp"].isna().all():
+        import streamlit as st
+        st.error(
+            "Chromosome length information is missing.\n\n"
+            "Please upload the chromosome map Excel file "
+            "(Sheet 2 must contain: chr, chr_length_bp)."
+        )
+        return None
+
     df["chr_len_mb"] = df["chr_length_bp"] / 1e6
+
 
     # -----------------------------
     # Discover chromosomes dynamically
