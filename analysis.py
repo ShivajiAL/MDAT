@@ -321,6 +321,12 @@ def plot_chromosome_map(marker_status_df, rp, dp):
     df = marker_status_df.merge(pos, on="marker", how="inner")
     df = df.merge(chr_len, on="chr", how="left")
     
+    import streamlit as st
+    st.write(
+        "DEBUG unmatched rows:",
+        df.loc[df["chr_length_bp"].isna(), ["chr"]].drop_duplicates()
+    )
+
     # --------------------------------------------------
     # FORCE canonical chromosome naming BEFORE merge
     # --------------------------------------------------
