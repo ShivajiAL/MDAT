@@ -309,8 +309,21 @@ def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
 
     
     
-    pos["marker"] = pos["marker"].astype(str).str.upper()
-    pos["chr"] = pos["chr"].astype(str)
+    pos["marker"] = pos["marker"].astype(str).str.strip().str.upper()
+    pos["chr"] = pos["chr"].astype(str).str.strip().str.upper()
+
+    # --------------------------------------------------
+    # NORMALIZE chromosome names CONSISTENTLY (CRITICAL)
+    # --------------------------------------------------
+    import re
+
+    def normalize_chr(x):
+        m = re.match(r"([A-Z]+)(\d+)", x)
+        if m:
+            return f"{m.group(1)}{int(m.group(2)):02d}"
+        return x
+
+    pos["chr"] = pos["chr"].apply(normalize_chr)
     
     marker_status_df["marker"] = marker_status_df["marker"].astype(str).str.upper()
 
