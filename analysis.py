@@ -277,7 +277,7 @@ def get_marker_status_for_map(upload_id, rp, dp):
     return pd.DataFrame(out)
 
 
-def plot_chromosome_map(marker_status_df, rp, dp):
+def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
     import pandas as pd
     import matplotlib.pyplot as plt
     from db import get_connection
@@ -293,69 +293,43 @@ def plot_chromosome_map(marker_status_df, rp, dp):
                 for t in re.findall(r"\d+|\D+", s)]
 
     # -----------------------------
-    # Load marker + chromosome data
+    # Load marker positions from DB
     # -----------------------------
     con = get_connection()
     pos = pd.read_sql("SELECT * FROM marker_positions", con)
-    chr_len = pd.read_sql("SELECT * FROM chromosome_lengths", con)
     con.close()
-    
-    # --------------------------------------------------
-    # HARD STOP: chromosome map must be uploaded first
-    # --------------------------------------------------
-    if chr_len.empty or pos.empty:
+    if pos.empty:
         import streamlit as st
         st.error(
             "Chromosome map cannot be plotted.\n\n"
-            "Please upload the chromosome map Excel file first "
-            "(both Sheet 1: marker positions and Sheet 2: chromosome lengths)."
+            "Marker position data is missing.\n"
+            "Please upload the marker position Excel file first."
         )
         return None
 
+    
     
     pos["marker"] = pos["marker"].astype(str).str.upper()
     pos["chr"] = pos["chr"].astype(str)
-    chr_len["chr"] = chr_len["chr"].astype(str)
+    
     marker_status_df["marker"] = marker_status_df["marker"].astype(str).str.upper()
 
     df = marker_status_df.merge(pos, on="marker", how="inner")
-    df = df.merge(chr_len, on="chr", how="left")
-    
-    import streamlit as st
-    st.write(
-        "DEBUG unmatched rows:",
-        df.loc[df["chr_length_bp"].isna(), ["chr"]].drop_duplicates()
-    )
 
-    # --------------------------------------------------
-    # FORCE canonical chromosome naming BEFORE merge
-    # --------------------------------------------------
+    # Normalize chr
     df["chr"] = df["chr"].astype(str).str.strip().str.upper()
-    chr_len["chr"] = chr_len["chr"].astype(str).str.strip().str.upper()
+    chrom_df["chr"] = chrom_df["chr"].astype(str).str.strip().str.upper()
 
-    # OPTIONAL: zero-pad chromosome numbers (A1 -> A01)
-    import re
-    def normalize_chr(x):
-        m = re.match(r"([A-Z]+)(\d+)", x)
-        if m:
-            return f"{m.group(1)}{int(m.group(2)):02d}"
-        return x
+    df = df.merge(chrom_df, on="chr", how="left")
 
-    df["chr"] = df["chr"].apply(normalize_chr)
-    chr_len["chr"] = chr_len["chr"].apply(normalize_chr)
-   
-    # ==================================================
-    # HARD GUARD – must be here (before ANY column use)
-    # ==================================================
-    if "chr_length_bp" not in df.columns:
+    if df["chr_length_bp"].isna().all():
         import streamlit as st
         st.error(
             "Chromosome map cannot be plotted.\n\n"
-            "Column 'chr_length_bp' is missing after merging chromosome map.\n"
-            "Please ensure Sheet 2 of the chromosome map Excel\n"
-            "contains columns: chr, chr_length_bp."
+            "Chromosome length data not available from uploaded file."
         )
         return None
+
 
     df["pos_mb"] = df["position_bp"] / 1e6
     df["chr_len_mb"] = df["chr_length_bp"] / 1e6
