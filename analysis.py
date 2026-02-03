@@ -327,7 +327,11 @@ def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
     
     marker_status_df["marker"] = marker_status_df["marker"].astype(str).str.upper()
 
-    df = marker_status_df.merge(pos, on="marker", how="inner")
+    df = marker_status_df.merge(
+        pos[["marker", "chr", "position_bp"]],
+        on="marker",
+        how="inner"
+    )
 
     # Normalize chr
     df["chr"] = df["chr"].astype(str).str.strip().str.upper()
