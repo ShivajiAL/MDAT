@@ -36,6 +36,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 # ---------------------------------------------
 # UI CSS (tabs centering + styling)
 # ---------------------------------------------
@@ -62,6 +63,38 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    """
+    <style>
+    /* Reduce overall vertical spacing */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
+    }
+
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.4rem;
+    }
+
+    h1, h2, h3, h4 {
+        margin-bottom: 0.25rem;
+    }
+
+    .stSelectbox, .stTextInput, .stFileUploader, .stButton {
+        margin-top: 0.25rem;
+    }
+
+    /* Disable page scrolling */
+    .main {
+        overflow-y: hidden;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 # -------------------------------------------------
 # Header
 # -------------------------------------------------
@@ -70,14 +103,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
-st.markdown(
-    "<p style='text-align:center; font-size:14px;'>"
-    "Version 1.0"
-    "</p>",
-    unsafe_allow_html=True
-) 
 
 st.markdown("---")
 
@@ -206,7 +231,11 @@ with tab2:
             st.stop()
 
         st.metric("🧬 Polymorphic markers identified", len(poly))
-        st.dataframe(poly, use_container_width=True)
+        st.dataframe(
+            poly,
+            height=350,
+            use_container_width=True
+        )
 
         # -------------------------------
         # Excel download
@@ -457,7 +486,7 @@ with tab4:
 # Footer
 # -------------------------------------------------
 st.markdown(
-    "<hr style='margin-top:40px;'>"
+    "<hr style='margin-top:50px;'>"
     "<center><small>Developed by SHIVAJI AJINATH LAVALE</small></center>",
     unsafe_allow_html=True
 )
