@@ -320,7 +320,19 @@ def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
     df["chr"] = df["chr"].astype(str).str.strip().str.upper()
     chrom_df["chr"] = chrom_df["chr"].astype(str).str.strip().str.upper()
 
+    # FIX IS HERE
+    import re
+    def normalize_chr(x):
+        m = re.match(r"([A-Z]+)(\d+)", x)
+        if m:
+            return f"{m.group(1)}{int(m.group(2)):02d}"
+        return x
+
+    df["chr"] = df["chr"].apply(normalize_chr)
+    chrom_df["chr"] = chrom_df["chr"].apply(normalize_chr)
+
     df = df.merge(chrom_df, on="chr", how="left")
+
 
     # --------------------------------------------------
     # FIX: flatten columns after merge (CRITICAL)
