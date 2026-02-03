@@ -370,7 +370,7 @@ with tab4:
     # INPUTS
     # ---------------------------------------------
     label = st.selectbox(
-        "Upload Group",
+        "Parent Genotype Upload Group",
         uploads,
         key="recovery_upload_label"
     )
