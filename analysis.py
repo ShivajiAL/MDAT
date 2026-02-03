@@ -299,7 +299,20 @@ def plot_chromosome_map(marker_status_df, rp, dp):
     pos = pd.read_sql("SELECT * FROM marker_positions", con)
     chr_len = pd.read_sql("SELECT * FROM chromosome_lengths", con)
     con.close()
+    
+    # --------------------------------------------------
+    # HARD STOP: chromosome map must be uploaded first
+    # --------------------------------------------------
+    if chr_len.empty or pos.empty:
+        import streamlit as st
+        st.error(
+            "Chromosome map cannot be plotted.\n\n"
+            "Please upload the chromosome map Excel file first "
+            "(both Sheet 1: marker positions and Sheet 2: chromosome lengths)."
+        )
+        return None
 
+    
     pos["marker"] = pos["marker"].astype(str).str.upper()
     pos["chr"] = pos["chr"].astype(str)
     chr_len["chr"] = chr_len["chr"].astype(str)
