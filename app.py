@@ -132,7 +132,18 @@ with tab1:
 
         m, c = save_marker_position_file(pos_file)
 
-        st.session_state["chrom_df"] = pd.read_excel(pos_file, sheet_name=1)
+        chrom_df = pd.read_excel(pos_file, sheet_name=1)
+
+        # Standardize column names (CRITICAL)
+        chrom_df.columns = chrom_df.columns.str.strip().str.lower()
+
+        # Enforce expected schema
+        chrom_df = chrom_df.rename(columns={
+            chrom_df.columns[0]: "chr",
+            chrom_df.columns[1]: "chr_length_bp"
+        })
+
+        st.session_state["chrom_df"] = chrom_df
         st.success(f"Marker position data uploaded: {m} markers, {c} chromosomes")
 
 
