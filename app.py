@@ -134,14 +134,33 @@ with tab1:
 
         chrom_df = pd.read_excel(pos_file, sheet_name=1)
 
-        # Standardize column names (CRITICAL)
+        # --------------------------------------------------
+        # Read chromosome length sheet safely
+        # --------------------------------------------------
+        chrom_df = pd.read_excel(pos_file, sheet_name=1)
+
+        # Normalize column names
         chrom_df.columns = chrom_df.columns.str.strip().str.lower()
 
-        # Enforce expected schema
-        chrom_df = chrom_df.rename(columns={
-            chrom_df.columns[0]: "chr",
-            chrom_df.columns[1]: "chr_length_bp"
-        })
+        # Explicit renaming (NO POSITION ASSUMPTIONS)
+        rename_map = {}
+
+        for col in chrom_df.columns:
+            if col.startswith("chr"):
+                rename_map[col] = "chr"
+            if "length" in col:
+                rename_map[col] = "chr_length_bp"
+
+        chrom_df = chrom_df.rename(columns=rename_map)
+
+        # HARD VALIDATION
+        required = {"chr", "chr_length_bp"}
+        if not required.issubset(chrom_df.columns):
+            st.error(
+                f"Chromosome map Sheet 2 must contain columns {required}.\n"
+                f"Found columns: {list(chrom_df.columns)}"
+            )
+            st.stop()
 
         st.session_state["chrom_df"] = chrom_df
         st.success(f"Marker position data uploaded: {m} markers, {c} chromosomes")
