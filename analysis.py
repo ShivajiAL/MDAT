@@ -322,6 +322,12 @@ def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
 
     df = df.merge(chrom_df, on="chr", how="left")
 
+    # --------------------------------------------------
+    # FIX: flatten columns after merge (CRITICAL)
+    # --------------------------------------------------
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    
     if "chr_length_bp" not in df.columns or df["chr_length_bp"].isna().all():
         import streamlit as st
         st.error(
