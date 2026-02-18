@@ -256,7 +256,7 @@ with tab2:
         rp_clean = rp.replace(" ", "_")
         dp_clean = dp.replace(" ", "_")
 
-        filename = f"{rp_clean}_{dp_clean}_Polymorphic_markers.xlsx"
+        filename = f"Polymorphic_markers_{rp_clean}_{dp_clean}.xlsx"
 
         st.download_button(
             "Download Polymorphic Markers (Excel)",
