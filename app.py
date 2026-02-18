@@ -252,10 +252,16 @@ with tab2:
 
         buffer.seek(0)
 
+        # Make RP & DP safe for filenames
+        rp_clean = rp.replace(" ", "_")
+        dp_clean = dp.replace(" ", "_")
+
+        filename = f"{rp_clean}_{dp_clean}_Polymorphic_markers.xlsx"
+
         st.download_button(
             "Download Polymorphic Markers (Excel)",
             buffer,
-            file_name="Polymorphic_markers_{rp}_{dp}.xlsx",
+            file_name=filename,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
