@@ -9,7 +9,14 @@ def classify_polymorphism(rp, dp):
     if (rp == "FAM" and dp == "HEX") or (rp == "HEX" and dp == "FAM"):
         return "POLYMORPHIC"
     return "MONOMORPHIC"
-def analyze_bc(upload_id, rp, dp, bc_samples):
+
+def analyze_bc(
+    bc_df,
+    rp,
+    dp,
+    effective_markers,
+    polymorphic_markers
+):
     """
     BC recovery calculation EXACTLY as per A–K logic.
     NA is COUNTED, never derived.
@@ -19,68 +26,80 @@ def analyze_bc(upload_id, rp, dp, bc_samples):
         raise ValueError("RP or DP not selected")
     if rp == dp:
         raise ValueError("RP and DP cannot be the same")
-
-    # ----------------------------
-    # Load data
-    # ----------------------------
-    con = get_connection()
-    df = pd.read_sql(
-        "SELECT marker, line, call FROM genotyping WHERE upload_id=?",
-        con,
-        params=(upload_id,)
-    )
-    con.close()
-
+    
     # ============================
-    # PARENT GENOTYPING (A–E)
+    # PREPARE BC DATA
     # ============================
-    parents = df[df.line.isin([rp, dp])].pivot(
-        index="marker",
-        columns="line",
-        values="call"
+
+    bc = bc_df.copy()
+
+    bc.columns = (
+        bc.columns.astype(str)
+        .str.strip()
+    )
+ 
+    line_col = bc.columns[0]
+
+    bc = bc.set_index(line_col)
+
+    bc.index = (
+        bc.index.astype(str)
+        .str.strip()
     )
 
-    A = parents.shape[0]
+    rp = str(rp).strip()
+    dp = str(dp).strip()
 
-    parents["status"] = parents.apply(
-        lambda r: classify_polymorphism(r[rp], r[dp]),
-        axis=1
+    bc = bc.applymap(
+        lambda x: str(x).strip().upper()
     )
+    
+    
+    if rp not in bc.index:
+        raise ValueError(f"{rp} not found in uploaded file.")
 
-    na_rp = set(parents[parents[rp] == "NA"].index)
-    na_dp = set(parents[parents[dp] == "NA"].index)
-    D_set = na_rp.union(na_dp)
+    if dp not in bc.index:
+        raise ValueError(f"{dp} not found in uploaded file.")
 
-    parents_eff = parents.drop(index=D_set)
+    rp_calls = bc.loc[rp]
+    dp_calls = bc.loc[dp]
 
-    poly_markers = set(
-    	parents_eff[
-        	((parents_eff[rp] == "FAM") & (parents_eff[dp] == "HEX")) |
-        	((parents_eff[rp] == "HEX") & (parents_eff[dp] == "FAM"))
-    	].index
-    )	
-    mono_markers = set(parents_eff.index) - poly_markers
+    poly_markers = []
 
-    C = len(mono_markers)
-    E = A - len(D_set)
+    mono_markers = []
+
+    for marker in bc.columns:
+
+        rp_call = str(rp_calls[marker]).strip().upper()
+        dp_call = str(dp_calls[marker]).strip().upper()
+
+        if rp_call == "NA" or dp_call == "NA":
+            continue
+
+        if (
+            (rp_call == "FAM" and dp_call == "HEX")
+            or
+            (rp_call == "HEX" and dp_call == "FAM")
+        ):
+            poly_markers.append(marker)
+        else:
+            mono_markers.append(marker)
+
+    C = effective_markers - polymorphic_markers
+    E = effective_markers
 
     # ============================
     # BC GENOTYPING (F–K)
     # ============================
-    bc_df = df[df.line.isin(bc_samples)]
     
-    if bc_df.empty:
-        raise ValueError(
-            "No BC samples found for recovery calculation. "
-            "Please upload BC genotyping data first."
-        )
-
     results = []
 
-    for plant, sub in bc_df.groupby("line"):
+    for plant in bc.index:
+ 
+        if plant in [rp, dp]:
+            continue
 
-        # BC calls that ACTUALLY EXIST
-        bc_calls = dict(zip(sub.marker, sub.call))
+        bc_calls = bc.loc[plant].to_dict()
 
         F = 0  # RP
         G = 0  # DP
@@ -96,9 +115,9 @@ def analyze_bc(upload_id, rp, dp, bc_samples):
 
             if bc_call == "NA":
                 I += 1
-            elif bc_call == parents.loc[m, rp]:
+            elif bc_call == rp_calls[m]:
                 F += 1
-            elif bc_call == parents.loc[m, dp]:
+            elif bc_call == dp_calls[m]:
                 G += 1
             elif bc_call == "HET":
                 H += 1
@@ -168,26 +187,51 @@ def analyze_bc(upload_id, rp, dp, bc_samples):
 
     return out
 
-def get_polymorphic_markers(upload_id, rp, dp):
-    con = get_connection()
-    df = pd.read_sql(
-        "SELECT marker, line, call FROM genotyping WHERE upload_id=?",
-        con, params=(upload_id,)
-    )
-    con.close()
+def get_polymorphic_markers(parent_df, rp, dp):
 
-    parents = df[df.line.isin([rp, dp])].pivot(
-        index="marker", columns="line", values="call"
+    df = parent_df.copy()
+
+    rp = rp.strip().upper()
+    dp = dp.strip().upper()
+
+    # Normalize column names
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.upper()
     )
+
+    # Normalize marker names
+    marker_col = df.columns[0]
+    df[marker_col] = (
+        df[marker_col]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    if rp not in df.columns:
+        raise ValueError(f"RP '{rp}' not found in uploaded file.")
+
+    if dp not in df.columns:
+        raise ValueError(f"DP '{dp}' not found in uploaded file.")
 
     records = []
-    for marker, row in parents.iterrows():
+
+    for _, row in df.iterrows():
+
         status = classify_polymorphism(row[rp], row[dp])
+
         if status == "POLYMORPHIC":
+
             records.append({
-                "Marker": marker,
+
+                "Marker": row[marker_col],
+
                 "RP_call": row[rp],
+
                 "DP_call": row[dp]
+
             })
 
     return pd.DataFrame(records)
@@ -241,43 +285,59 @@ def save_marker_position_file(excel_file):
     return len(markers_df), len(chrom_df)
 
 
-def get_marker_status_for_map(upload_id, rp, dp):
-    import pandas as pd
-    from db import get_connection
+def get_marker_status_for_map(parent_df, rp, dp):
 
-    con = get_connection()
-
-    df = pd.read_sql(
-        "SELECT marker, line, call FROM genotyping WHERE upload_id=?",
-        con,
-        params=(upload_id,)
-    )
-
-    con.close()
+    df = parent_df.copy()
 
     rp = rp.strip().upper()
     dp = dp.strip().upper()
-    df["marker"] = df["marker"].astype(str).str.strip().str.upper()
-    df["line"] = df["line"].astype(str).str.strip().str.upper()
+
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    marker_col = df.columns[0]
+
+    df[marker_col] = (
+        df[marker_col]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    if rp not in df.columns:
+        raise ValueError(f"RP '{rp}' not found.")
+
+    if dp not in df.columns:
+        raise ValueError(f"DP '{dp}' not found.")
 
     out = []
 
-    for marker, sub in df.groupby("marker"):
-        rp_call = sub.loc[sub.line == rp, "call"]
-        dp_call = sub.loc[sub.line == dp, "call"]
+    for _, row in df.iterrows():
 
-        status = "OTHER"
-        if not rp_call.empty and not dp_call.empty:
-            a, b = rp_call.iloc[0], dp_call.iloc[0]
-            if (a == "FAM" and b == "HEX") or (a == "HEX" and b == "FAM"):
-                status = "POLY"
+        status = classify_polymorphism(row[rp], row[dp])
 
-        out.append({"marker": marker, "status": status})
+        out.append({
+
+            "marker": row[marker_col],
+
+            "status": "POLY" if status == "POLYMORPHIC" else "MONO"
+
+        })
 
     return pd.DataFrame(out)
 
 
-def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
+def plot_chromosome_map(
+    marker_status_df,
+    marker_df,
+    chrom_df,
+    rp,
+    dp
+):
+    
     import pandas as pd
     import matplotlib.pyplot as plt
     from db import get_connection
@@ -293,85 +353,22 @@ def plot_chromosome_map(marker_status_df, rp, dp, chrom_df):
                 for t in re.findall(r"\d+|\D+", s)]
 
     # -----------------------------
-    # Load marker positions from DB
+    # Load marker + chromosome data
     # -----------------------------
-    con = get_connection()
-    pos = pd.read_sql("SELECT * FROM marker_positions", con)
-    con.close()
-    if pos.empty:
-        import streamlit as st
-        st.error(
-            "Chromosome map cannot be plotted.\n\n"
-            "Marker position data is missing.\n"
-            "Please upload the marker position Excel file first."
-        )
-        return None
+    pos = marker_df.copy()
 
-    
-    
-    pos["marker"] = pos["marker"].astype(str).str.strip().str.upper()
-    pos["chr"] = pos["chr"].astype(str).str.strip().str.upper()
+    chr_len = chrom_df.copy()
 
-    # --------------------------------------------------
-    # NORMALIZE chromosome names CONSISTENTLY (CRITICAL)
-    # --------------------------------------------------
-    import re
-
-    def normalize_chr(x):
-        m = re.match(r"([A-Z]+)(\d+)", x)
-        if m:
-            return f"{m.group(1)}{int(m.group(2)):02d}"
-        return x
-
-    pos["chr"] = pos["chr"].apply(normalize_chr)
-    
+    pos["marker"] = pos["marker"].astype(str).str.upper()
+    pos["chr"] = pos["chr"].astype(str)
+    chr_len["chr"] = chr_len["chr"].astype(str)
     marker_status_df["marker"] = marker_status_df["marker"].astype(str).str.upper()
 
-    df = marker_status_df.merge(
-        pos[["marker", "chr", "position_bp"]],
-        on="marker",
-        how="inner"
-    )
-
-    # Normalize chr
-    df["chr"] = df["chr"].astype(str).str.strip().str.upper()
-    chrom_df["chr"] = chrom_df["chr"].astype(str).str.strip().str.upper()
-
-    # FIX IS HERE
-    import re
-    def normalize_chr(x):
-        m = re.match(r"([A-Z]+)(\d+)", x)
-        if m:
-            return f"{m.group(1)}{int(m.group(2)):02d}"
-        return x
-
-    df["chr"] = df["chr"].apply(normalize_chr)
-    chrom_df["chr"] = chrom_df["chr"].apply(normalize_chr)
-
-    df = df.merge(chrom_df, on="chr", how="left")
-
-
-    # --------------------------------------------------
-    # FIX: flatten columns after merge (CRITICAL)
-    # --------------------------------------------------
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    
-    if "chr_length_bp" not in df.columns or df["chr_length_bp"].isna().all():
-        import streamlit as st
-        st.error(
-            "Chromosome map cannot be plotted.\n\n"
-            "Chromosome length information is missing.\n"
-            "Please ensure Sheet 2 of the chromosome map Excel\n"
-            "contains columns: chr, chr_length_bp."
-        )
-        return None
-
-
+    df = marker_status_df.merge(pos, on="marker", how="inner")
+    df = df.merge(chr_len, on="chr", how="left")
 
     df["pos_mb"] = df["position_bp"] / 1e6
     df["chr_len_mb"] = df["chr_length_bp"] / 1e6
-
 
     # -----------------------------
     # Discover chromosomes dynamically

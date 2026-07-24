@@ -10,8 +10,14 @@ if "poly_ready" not in st.session_state:
 if "show_chr_map" not in st.session_state:
     st.session_state.show_chr_map = False
 
-from db import init_db, get_uploads, get_upload_id
-from io_utils import upload_parent_matrix, upload_bc_matrix
+if "parent_uploaded" not in st.session_state:
+    st.session_state.parent_uploaded = False
+
+if "marker_uploaded" not in st.session_state:
+    st.session_state.marker_uploaded = False
+
+from db import init_db
+from io_utils import upload_bc_matrix
 from analysis import analyze_bc
 
 # -------------------------------------------------
@@ -36,7 +42,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 # ---------------------------------------------
 # UI CSS (tabs centering + styling)
 # ---------------------------------------------
@@ -63,38 +68,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown(
-    """
-    <style>
-    /* Reduce overall vertical spacing */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0.5rem;
-    }
-
-    div[data-testid="stVerticalBlock"] > div {
-        gap: 0.4rem;
-    }
-
-    h1, h2, h3, h4 {
-        margin-bottom: 0.25rem;
-    }
-
-    .stSelectbox, .stTextInput, .stFileUploader, .stButton {
-        margin-top: 0.25rem;
-    }
-
-    /* Disable page scrolling */
-    .main {
-        overflow-y: hidden;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-
 # -------------------------------------------------
 # Header
 # -------------------------------------------------
@@ -104,18 +77,23 @@ st.markdown(
 )
 
 
-st.markdown("---")
 
-uploads = get_uploads()
+st.markdown(
+    "<p style='text-align:center; font-size:14px;'>"
+    "Version 1.1"
+    "</p>",
+    unsafe_allow_html=True
+) 
+
+st.markdown("---")
 
 # -------------------------------------------------
 # MAIN TABS
 # -------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "🧬 Parent Genotyping data",
     "🔍 Get Polymorphic Markers",
-    "🌱 BC Genotyping data",
-    "📊 Get BG Recovery & Ranking"
+    "📊 BG Recovery Analysis"
 ])
 
 # =================================================
@@ -125,20 +103,35 @@ with tab1:
 
     st.subheader("Upload Parent Genotyping Data")
 
-    label = st.text_input(
-        "Upload Group (e.g. Pair 1-15)",
-        key="parent_upload_label"
-    )
+    
     file = st.file_uploader(
         "Upload Excel file",
         type="xlsx",
         key="parent_upload_file"
     )
 
-    if st.button("Upload Genotyping Data", key="parent_upload_btn") and file and label:
-        upload_parent_matrix(file, label)
-        st.success("Parent genotyping data uploaded successfully")
-        st.info(f"📅 Upload period: {label}")
+    if st.button("Upload Genotyping Data", key="parent_upload_btn"):
+
+        if file is None:
+            st.error("Please upload the parent genotyping file.")
+            st.stop()
+
+        parent_df = pd.read_excel(file)
+
+        # Standardize IDs
+        parent_df.iloc[:, 0] = (
+            parent_df.iloc[:, 0]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
+        st.session_state["parent_df"] = parent_df
+        st.session_state.parent_uploaded = True
+
+        st.session_state.parent_uploaded = True
+ 
+        st.success("Parent genotyping data uploaded successfully.")
 
     #Block for Marker position data upload
 
@@ -152,90 +145,98 @@ with tab1:
     )
 
 
-    if st.button("Upload Marker Position Data") and pos_file:
-        from analysis import save_marker_position_file
+    if st.button("Upload Marker Position Data"):
 
-        m, c = save_marker_position_file(pos_file)
-
-        chrom_df = pd.read_excel(pos_file, sheet_name=1)
-
-        # --------------------------------------------------
-        # Read chromosome length sheet safely
-        # --------------------------------------------------
-        chrom_df = pd.read_excel(pos_file, sheet_name=1)
-
-        # Normalize column names
-        chrom_df.columns = chrom_df.columns.str.strip().str.lower()
-
-        # Explicit renaming (NO POSITION ASSUMPTIONS)
-        rename_map = {}
-
-        for col in chrom_df.columns:
-            if col.startswith("chr"):
-                rename_map[col] = "chr"
-            if "length" in col:
-                rename_map[col] = "chr_length_bp"
-
-        chrom_df = chrom_df.rename(columns=rename_map)
-
-        # HARD VALIDATION
-        required = {"chr", "chr_length_bp"}
-        if not required.issubset(chrom_df.columns):
-            st.error(
-                f"Chromosome map Sheet 2 must contain columns {required}.\n"
-                f"Found columns: {list(chrom_df.columns)}"
-            )
+        if pos_file is None:
+            st.error("Please upload the marker position file.")
             st.stop()
 
-        st.session_state["chrom_df"] = chrom_df
-        st.success(f"Marker position data uploaded: {m} markers, {c} chromosomes")
+        from analysis import save_marker_position_file
 
+        marker_sheet = pd.read_excel(pos_file, sheet_name=0)
+        chrom_sheet = pd.read_excel(pos_file, sheet_name=1)
 
+        # Standardize column names
+        marker_sheet.columns = ["marker", "chr", "position_bp"]
+        chrom_sheet.columns = ["chr", "chr_length_bp"]
+
+        # Normalize
+        marker_sheet["marker"] = marker_sheet["marker"].astype(str).str.strip().str.upper()
+        marker_sheet["chr"] = marker_sheet["chr"].astype(str).str.strip().str.upper()
+
+        chrom_sheet["chr"] = chrom_sheet["chr"].astype(str).str.strip().str.upper()
+
+        st.session_state["marker_df"] = marker_sheet
+        st.session_state["chrom_df"] = chrom_sheet
+
+        st.session_state.marker_uploaded = True
+
+        st.success(
+            f"Marker position data uploaded: "
+            f"{len(marker_sheet)} markers, "
+            f"{len(chrom_sheet)} chromosomes"
+        )
+        
+        
 # =================================================
 # TAB 2: RP–DP POLYMORPHIC MARKERS
 # =================================================
 with tab2:
 
-    st.subheader("RP–DP Polymorphic Marker List")
+    st.subheader("Polymorphic Marker List")
+    rp = None
+    dp = None
+    if not st.session_state.parent_uploaded:
+        st.info("Please upload Parent Genotyping Data in Tab 1.")
+    
+    else:
+    
+        parent_df = st.session_state["parent_df"]
 
-    label = st.selectbox(
-        "Parent Genotype Upload Group",
-        uploads,
-        key="poly_upload_label"
-    )
+        parent_names = (
+            parent_df.columns[1:]
+            .astype(str)
+            .str.strip()
+            .tolist()
+        )
+            
+        rp = st.selectbox(
+            "Recurrent Parent",
+            options=parent_names,
+            index=0,
+            key="poly_rp"
+        )
 
-    rp = st.text_input(
-        "Recurrent Parent ID",
-        key="poly_rp"
-    )
+        dp = st.selectbox(
+            "Donor Parent",
+            options=parent_names,
+            index=1 if len(parent_names) > 1 else 0,
+            key="poly_dp"
+        )
 
-    dp = st.text_input(
-        "Donor Parent ID",
-        key="poly_dp"
-    )
+    if st.session_state.parent_uploaded and st.button(
+        "View Polymorphic Markers",
+        key="poly_btn"
+    ):
 
-    if st.button("View Polymorphic Markers", key="poly_btn"):
-
-        if not rp or not dp:
-            st.error("Please enter both RP and DP IDs")
+        if rp == dp:
+            st.error("Recurrent Parent and Donor Parent cannot be the same.")
             st.stop()
-
-        uid = get_upload_id(label)
 
         from analysis import get_polymorphic_markers
 
-        poly = get_polymorphic_markers(uid, rp, dp)
+        poly = get_polymorphic_markers(
+            st.session_state["parent_df"],
+            rp,
+            dp
+        )
 
         if poly.empty:
             st.warning("No polymorphic markers found for the selected RP/DP pair")
             st.stop()
 
         st.metric("🧬 Polymorphic markers identified", len(poly))
-        st.dataframe(
-            poly,
-            height=350,
-            use_container_width=True
-        )
+        st.dataframe(poly, use_container_width=True)
 
         # -------------------------------
         # Excel download
@@ -252,41 +253,35 @@ with tab2:
 
         buffer.seek(0)
 
-        # Make RP & DP safe for filenames
-        rp_clean = rp.replace(" ", "_")
-        dp_clean = dp.replace(" ", "_")
-
-        filename = f"Polymorphic_markers_{rp_clean}_{dp_clean}.xlsx"
-
         st.download_button(
             "Download Polymorphic Markers (Excel)",
             buffer,
-            file_name=filename,
+            file_name="Polymorphic_markers.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     st.markdown("---")
     
-    if st.button("View Chromosome-wise Marker Map"):
+    if st.session_state.parent_uploaded and st.button(
+        "View Chromosome-wise Marker Map"
+    ):
 
         from analysis import get_marker_status_for_map, plot_chromosome_map
-   
-        
-        if "chrom_df" not in st.session_state:
-            st.error("Please upload chromosome map file first.")
-            st.stop()
 
-        uid = get_upload_id(label)
-        
-        marker_status = get_marker_status_for_map(uid, rp, dp)
+        marker_status = get_marker_status_for_map(
+            st.session_state["parent_df"],
+            rp,
+            dp
+        )
 
         fig = plot_chromosome_map(
             marker_status,
+            st.session_state["marker_df"],
+            st.session_state["chrom_df"],
             rp,
-            dp,
-            st.session_state["chrom_df"]
+            dp
         )
-        
+
         st.pyplot(fig)
 
         import io
@@ -321,49 +316,51 @@ with tab3:
 
     st.subheader("Upload BC Genotyping Data")
 
-    label = st.selectbox(
-        "Parent Genotype Upload Group",
-        uploads,
-        key="bc_upload_label"
-    )
-
-    rp = st.text_input(
-        "Recurrent Parent ID",
-        key="bc_rp"
-    )
-    dp = st.text_input(
-        "Donor Parent ID",
-        key="bc_dp"
-    )
-
+    
     file = st.file_uploader(
         "Upload BC Excel file",
         type="xlsx",
         key="bc_upload_file"
     )
 
-    if st.button("Upload Genotyping Data", key="bc_upload_btn") and file:
+    if file is not None:
 
-        if not rp or not dp:
-            st.error("Please enter both RP and DP names")
-            st.stop()
-
-        bc_df = pd.read_excel(file)
-        bc_samples = bc_df.iloc[:, 0].astype(str).tolist()
-
-        st.session_state["bc_samples"] = bc_samples
         
+        bc_df = pd.read_excel(
+            file,
+            keep_default_na=False
+        )
 
-        upload_bc_matrix(file, label)
+        # Standardize line names
+        bc_df.iloc[:, 0] = (
+            bc_df.iloc[:, 0]
+            .astype(str)
+            .str.strip()
+        )
 
-        st.success(
-            f"BC data uploaded ({len(bc_samples)} samples) | RP: {rp} | DP: {dp}"
+        st.session_state["bc_df"] = bc_df
+
+        line_names = bc_df.iloc[:, 0].tolist()
+
+        marker_count = bc_df.shape[1] - 1
+
+        plant_count = max(len(line_names) - 2, 0)
+
+        st.success("BC genotyping data uploaded successfully.")
+
+        st.info(f"""
+        
+        Detected rows : {len(line_names)}
+
+        Detected markers : {marker_count}
+
+        Detected BC plants : {plant_count}
+        """
         )
 
 # =================================================
-# TAB 4: BG RECOVERY & RANKING
+# BG RECOVERY & RANKING
 # =================================================
-with tab4:
 
     # ---------------------------------------------
     # INFO PANEL (OPTION 3 – SECTION PANEL)
@@ -372,40 +369,94 @@ with tab4:
 
     st.subheader("BG Recovery & Ranking")
 
-    # ---------------------------------------------
-    # INPUTS
-    # ---------------------------------------------
-    label = st.selectbox(
-        "Parent Genotype Upload Group",
-        uploads,
-        key="recovery_upload_label"
-    )
+    if "bc_df" not in st.session_state:
+        st.info("Upload a BC genotyping file to continue.")
+        rp = None
+        dp = None
+        line_names = []
+    else:
 
-    rp = st.text_input(
-        "Recurrent Parent ID",
-        key="recovery_rp"
-    )
+        bc_df = st.session_state["bc_df"]
 
-    dp = st.text_input(
-        "Donor Parent ID",
-        key="recovery_dp"
-    )
+        line_names = (
+            bc_df.iloc[:, 0]
+            .astype(str)
+            .str.strip()
+            .tolist()
+        )
+
+        rp = st.selectbox(
+            "Detected Recurrent Parent",
+            options=line_names,
+            index=0,
+            key="recovery_rp"
+        )
+
+        dp = st.selectbox(
+            "Detected Donor Parent",
+            options=line_names,
+            index=1 if len(line_names) > 1 else 0,
+            key="recovery_dp"
+        )
+
+        # Remaining BG Recovery widgets...
+
+    
+    if "bc_df" in st.session_state:
+
+        st.caption(
+            f"BC plants available: {max(len(line_names)-2, 0)}"
+        )
+
+        st.markdown("---")
+
+        effective_markers = st.number_input(
+            "Effective Markers",
+            min_value=1,
+            step=1,
+            key="effective_markers"
+        )
+
+        polymorphic_markers = st.number_input(
+            "Polymorphic Markers",
+            min_value=0,
+            max_value=effective_markers,
+            step=1,
+            key="polymorphic_markers"
+        )
+
+        monomorphic_markers = effective_markers - polymorphic_markers
+
+        st.metric(
+            "Monomorphic Markers",
+            monomorphic_markers
+        )    
+
 
     # ---------------------------------------------
     # RUN ANALYSIS
     # ---------------------------------------------
-    if st.button("Analyze BG Recovery", key="recovery_btn"):
+    if "bc_df" in st.session_state and st.button("Analyze BG Recovery", key="recovery_btn"):
 
-        uid = get_upload_id(label)
-        if "bc_samples" not in st.session_state:
+        
+        if "bc_df" not in st.session_state:
             st.error("Please upload BC genotyping data first")
+            st.stop()
+        
+        if rp == dp:
+            st.error("Recurrent Parent and Donor Parent cannot be the same.")
+            st.stop()
+
+        if effective_markers == 0:
+            st.error("Please enter the number of effective markers.")
             st.stop()
 
         res = analyze_bc(
-            uid,
+            st.session_state["bc_df"],
             rp,
             dp,
-            st.session_state["bc_samples"]
+            effective_markers,
+            polymorphic_markers
         )
 
         # -----------------------------------------
@@ -492,8 +543,8 @@ with tab4:
 # Footer
 # -------------------------------------------------
 st.markdown(
-    "<hr style='margin-top:50px;'>"
-    "<center><small>Developed by SHIVAJI AJINATH LAVALE</small></center>",
+    "<hr style='margin-top:40px;'>"
+    "<center><small>Developed by SHIVAJI AJINATH LAVALE @ KSCL</small></center>",
     unsafe_allow_html=True
 )
 
