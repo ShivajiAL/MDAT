@@ -31,7 +31,7 @@ st.set_page_config(
 )
 
 
-st.markdown(
+#st.markdown(
     """
     <style>
 
