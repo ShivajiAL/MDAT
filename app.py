@@ -27,7 +27,7 @@ init_db()
 
 st.set_page_config(
     page_title="MABS Tool",
-    layout="wide"
+    layout="center"
 )
 
 
