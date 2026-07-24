@@ -31,20 +31,20 @@ st.set_page_config(
 )
 
 
-#st.markdown(
-#    """
-#    <style>
-#
-#    section.main > div {
-#        max-width: 1500px;
-#        padding-left: 2rem;
-#        padding-right: 2rem;
-#    }
-#
-#    </style>
-#    """,
- #   unsafe_allow_html=True
-#)
+st.markdown(
+    """
+    <style>
+
+    section.main > div {
+        max-width: 1500px;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    </style>
+    """,
+   unsafe_allow_html=True
+)
 # ---------------------------------------------
 # UI CSS (Equal width tabs)
 # ---------------------------------------------
