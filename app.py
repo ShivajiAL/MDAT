@@ -36,9 +36,9 @@ st.markdown(
     <style>
     /* Limit content width and center it */
     .block-container {
-        max-width: 1400px;
-        padding-left: 3.5rem;
-        padding-right: 3.5rem;
+        max-width: 1500px;
+        padding-left: 2.5rem;
+        padding-right: 2.5rem;
     }
     </style>
     """,
