@@ -36,9 +36,9 @@ st.markdown(
     <style>
 
     section.main > div {
-        max-width: 1500px;
-        padding-left: 2rem;
-        padding-right: 2rem;
+        max-width: 1200px;
+        padding-left: 3.5rem;
+        padding-right: 3.5rem;
     }
 
     </style>
