@@ -29,12 +29,14 @@ st.set_page_config(
     page_title="MABS Tool",
     layout="wide"
 )
+
+
 st.markdown(
     """
     <style>
     /* Limit content width and center it */
     .block-container {
-        max-width: 1100px;
+        max-width: 1400px;
         padding-left: 3.5rem;
         padding-right: 3.5rem;
     }
@@ -43,26 +45,35 @@ st.markdown(
     unsafe_allow_html=True
 )
 # ---------------------------------------------
-# UI CSS (tabs centering + styling)
+# UI CSS (Equal width tabs)
 # ---------------------------------------------
 st.markdown(
     """
     <style>
-    /* Center align the tab bar */
+
+    /* Make tab bar use full width */
     div[data-baseweb="tab-list"] {
-        justify-content: center;
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
     }
 
-    /* Increase tab label font size */
+    /* Each tab gets equal width */
+    button[data-baseweb="tab"] {
+        flex: 1 1 0%;
+        justify-content: center;
+        text-align: center;
+        padding: 10px 0px !important;
+    }
+
+    /* Tab label */
     button[data-baseweb="tab"] > div {
         font-size: 18px !important;
         font-weight: 600;
+        width: 100%;
+        text-align: center;
     }
 
-    /* Increase tab padding */
-    button[data-baseweb="tab"] {
-        padding: 3px 13px !important;
-    }
     </style>
     """,
     unsafe_allow_html=True
