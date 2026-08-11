@@ -287,7 +287,7 @@ with tab2:
         ):
 
             st.info(
-                "Please upload SNP Marker Position File in Tab 1 "
+                "Upload SNP Marker Position File in Tab 1 "
                 "to continue"
             )
 
