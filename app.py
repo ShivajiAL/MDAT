@@ -278,47 +278,75 @@ with tab2:
         "View Chromosome-wise Marker Map"
     ):
 
-        from analysis import get_marker_status_for_map, plot_chromosome_map
+        # ---------------------------------------------
+        # Check SNP position file
+        # ---------------------------------------------
+        if (
+            "marker_df" not in st.session_state
+            or "chrom_df" not in st.session_state
+        ):
 
-        marker_status = get_marker_status_for_map(
-            st.session_state["parent_df"],
-            rp,
-            dp
-        )
+            st.info(
+                "Please upload SNP Marker Position File in Tab 1 "
+                "to continue"
+            )
 
-        fig = plot_chromosome_map(
-            marker_status,
-            st.session_state["marker_df"],
-            st.session_state["chrom_df"],
-            rp,
-            dp
-        )
+        else:
 
-        st.pyplot(fig)
+            from analysis import (
+                get_marker_status_for_map,
+                plot_chromosome_map
+            )
 
-        import io
+            marker_status = get_marker_status_for_map(
+                st.session_state["parent_df"],
+                rp,
+                dp
+            )
 
-        png = io.BytesIO()
-        fig.savefig(png, format="png", dpi=300, bbox_inches="tight")
-        png.seek(0)
+            fig = plot_chromosome_map(
+                marker_status,
+                st.session_state["marker_df"],
+                st.session_state["chrom_df"],
+                rp,
+                dp
+            )
 
-        jpg = io.BytesIO()
-        fig.savefig(jpg, format="jpg", dpi=300, bbox_inches="tight")
-        jpg.seek(0)
+            st.pyplot(fig)
 
-        st.download_button(
-            "Download Map (PNG)",
-            png,
-            file_name=f"Chr_Map_{rp}_{dp}.png",
-            mime="image/png"
-        )
+            import io
 
-        st.download_button(
-            "Download Map (JPG)",
-            jpg,
-            file_name=f"Chr_Map_{rp}_{dp}.jpg",
-            mime="image/jpeg"
-        )
+            png = io.BytesIO()
+            fig.savefig(
+                png,
+                format="png",
+                dpi=300,
+                bbox_inches="tight"
+            )
+            png.seek(0)
+
+            jpg = io.BytesIO()
+            fig.savefig(
+                jpg,
+                format="jpg",
+                dpi=300,
+                bbox_inches="tight"
+            )
+            jpg.seek(0)
+
+            st.download_button(
+                "Download Map (PNG)",
+                png,
+                file_name=f"Chr_Map_{rp}_{dp}.png",
+                mime="image/png"
+            )
+
+            st.download_button(
+                "Download Map (JPG)",
+                jpg,
+                file_name=f"Chr_Map_{rp}_{dp}.jpg",
+                mime="image/jpeg"
+            )
 
 
 # =================================================
