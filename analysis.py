@@ -413,8 +413,7 @@ def plot_chromosome_map(
     max_markers_per_chr = df.groupby("chr")["marker"].count().max()
     base_gap = -0.1
     density_factor = 0.015
-    auto_hspace = min(base_gap + max_markers_per_chr * density_factor, 1.6)
-
+    auto_hspace = 0.30
     # -----------------------------
     # Create figure
     # -----------------------------
