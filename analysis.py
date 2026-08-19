@@ -522,5 +522,5 @@ def plot_chromosome_map(
         bbox_to_anchor=(0.5, 0.02)
     )
 
-    plt.tight_layout(rect=[0, 0.06, 1, 0.94])
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     return fig
