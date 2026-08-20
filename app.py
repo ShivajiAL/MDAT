@@ -268,7 +268,7 @@ with tab2:
         st.download_button(
             "Download Polymorphic Markers (Excel)",
             buffer,
-            file_name="Polymorphic_markers.xlsx",
+            file_name=f"Polymorphic_markers_{rp}_{dp}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
