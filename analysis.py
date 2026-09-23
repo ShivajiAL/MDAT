@@ -413,7 +413,8 @@ def plot_chromosome_map(
     max_markers_per_chr = df.groupby("chr")["marker"].count().max()
     base_gap = -0.1
     density_factor = 0.015
-    auto_hspace = 0.30
+    auto_hspace = 0.35
+
     # -----------------------------
     # Create figure
     # -----------------------------
@@ -523,4 +524,417 @@ def plot_chromosome_map(
     )
 
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    return fig
+
+def plot_visual_recovery(
+    bc_df,
+    rp,
+    dp,
+    marker_df,
+    chrom_df,
+    ranked_results
+):
+    """
+    Create graphical representation of background recovery.
+
+    - Plants ordered according to BG Recovery ranking
+    - Plant IDs shown on left
+    - Chromosome widths proportional to actual chromosome length
+    - Marker calls converted to continuous segments using midpoint interpolation
+    - Chromosome ends inherit color of terminal markers
+    """
+
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    from matplotlib.gridspec import GridSpec
+    from matplotlib.patches import Patch
+    import re
+
+    # -----------------------------------------
+    # Helper: natural chromosome sorting
+    # -----------------------------------------
+    def natural_key(s):
+        return [
+            int(t) if t.isdigit() else t.lower()
+            for t in re.findall(r"\d+|\D+", str(s))
+        ]
+
+    # -----------------------------------------
+    # Prepare BC genotype data
+    # -----------------------------------------
+    bc = bc_df.copy()
+
+    bc.columns = (
+        bc.columns.astype(str)
+        .str.strip()
+    )
+
+    line_col = bc.columns[0]
+
+    bc = bc.set_index(line_col)
+
+    bc.index = (
+        bc.index.astype(str)
+        .str.strip()
+    )
+
+    bc = bc.applymap(
+        lambda x: str(x).strip().upper()
+    )
+
+    rp = str(rp).strip()
+    dp = str(dp).strip()
+
+    # -----------------------------------------
+    # Prepare marker position information
+    # -----------------------------------------
+    pos = marker_df.copy()
+    chr_len = chrom_df.copy()
+
+    pos["marker"] = (
+        pos["marker"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    pos["chr"] = pos["chr"].astype(str).str.strip()
+
+    chr_len["chr"] = (
+        chr_len["chr"]
+        .astype(str)
+        .str.strip()
+    )
+
+    pos["position_bp"] = pd.to_numeric(
+        pos["position_bp"],
+        errors="coerce"
+    )
+
+    chr_len["chr_length_bp"] = pd.to_numeric(
+        chr_len["chr_length_bp"],
+        errors="coerce"
+    )
+
+    # -----------------------------------------
+    # Use all markers from SNP position file
+    # -----------------------------------------
+    pos["marker"] = (
+        pos["marker"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    # Merge chromosome lengths
+    pos = pos.merge(
+        chr_len[["chr", "chr_length_bp"]],
+        on="chr",
+        how="left"
+    )
+
+    # Remove incomplete positional records
+    pos = pos.dropna(
+        subset=["position_bp", "chr_length_bp"]
+    )
+
+    # -----------------------------------------
+    # Chromosome order
+    # -----------------------------------------
+    chromosomes = sorted(
+        pos["chr"].unique(),
+        key=natural_key
+    )
+
+    # -----------------------------------------
+    # Get plants in BG recovery rank order
+    # -----------------------------------------
+    ranked = ranked_results.copy()
+
+    # Your analyze_bc output uses "Plant No"
+    # -----------------------------------------
+    # Plant order
+    # RP first, DP second, followed by BC plants
+    # in BG recovery rank order
+    # -----------------------------------------
+    bc_plant_order = (
+        ranked
+        .sort_values("Rank")
+        ["Plant No"]
+        .astype(str)
+        .str.strip()
+        .tolist()
+    )
+
+    plant_order = [rp, dp] + bc_plant_order
+
+    # Keep only plants actually present
+    plant_order = [
+        p for p in plant_order
+        if p in bc.index
+    ]
+
+    # -----------------------------------------
+    # Classification colors
+    # -----------------------------------------
+    colors = {
+        "RP": "#2E8B57",   # green
+        "DP": "#E31A1C",   # red
+        "HET": "#FFD92F",  # yellow
+        "NA": "#FFFFFF",   # white
+        "MONO": "#90EE90"      # light green
+    }
+
+    # -----------------------------------------
+    # Calculate chromosome width ratios
+    # -----------------------------------------
+    chromosome_lengths = []
+
+    for chrom in chromosomes:
+
+        length = (
+            pos.loc[
+                pos["chr"] == chrom,
+                "chr_length_bp"
+            ]
+            .iloc[0]
+        )
+
+        chromosome_lengths.append(length)
+
+    # -----------------------------------------
+    # Figure sizing
+    # -----------------------------------------
+    n_plants = len(plant_order)
+    
+    # -----------------------------------------
+    # Row spacing
+    # -----------------------------------------
+    row_height = 0.85      # Actual coloured row height
+    row_spacing = 1.0      # Distance between rows
+
+    y_positions = []
+
+    for i, plant in enumerate(plant_order):
+
+        # Normal spacing
+        y = i * row_spacing
+
+        # Add extra separation after RP and DP
+        if i >= 2:
+            y += 0.40
+
+        y_positions.append(y)
+    
+    fig_height = max(
+        5,
+        0.38 * n_plants + 2
+    )
+
+    fig_width = 24
+
+    fig = plt.figure(
+        figsize=(fig_width, fig_height)
+    )
+
+    gs = GridSpec(
+        1,
+        len(chromosomes),
+        figure=fig,
+        width_ratios=chromosome_lengths,
+        wspace=0.03
+    )
+
+    axes = []
+
+    # -----------------------------------------
+    # Create chromosome axes
+    # -----------------------------------------
+    for i, chrom in enumerate(chromosomes):
+
+        ax = fig.add_subplot(gs[0, i])
+
+        axes.append(ax)
+
+        chr_markers = (
+            pos[pos["chr"] == chrom]
+            .sort_values("position_bp")
+            .reset_index(drop=True)
+        )
+
+        chr_length = (
+            chr_markers["chr_length_bp"]
+            .iloc[0]
+        )
+
+        marker_names = chr_markers["marker"].tolist()
+        marker_positions = chr_markers["position_bp"].tolist()
+
+        # -------------------------------------
+        # Plot each plant
+        # -------------------------------------
+        for row_idx, plant in enumerate(plant_order):
+
+            # Y position for this plant
+            y = y_positions[row_idx]
+            
+            calls = []
+
+            for marker in marker_names:
+
+            # -----------------------------------------
+            # Monomorphic marker
+            # Marker is not present in BC genotype file
+            # -----------------------------------------
+                if marker not in bc.columns:
+
+                    status = "MONO"
+
+                else:
+
+                    plant_call = str(
+                        bc.loc[plant, marker]
+                    ).strip().upper()
+
+                    rp_call = str(
+                        bc.loc[rp, marker]
+                    ).strip().upper()
+
+                    dp_call = str(
+                        bc.loc[dp, marker]
+                    ).strip().upper()
+
+                    if plant_call == "NA":
+
+                        status = "NA"
+
+                    elif plant_call == "HET":
+
+                        status = "HET"
+
+                    elif plant_call == rp_call:
+
+                        status = "RP"
+
+                    elif plant_call == dp_call:
+
+                        status = "DP"
+
+                    else:
+
+                        status = "NA"
+
+                calls.append(status)
+
+            # ---------------------------------
+            # Midpoint interpolation boundaries
+            # ---------------------------------
+            boundaries = [0]
+
+            for j in range(len(marker_positions) - 1):
+                midpoint = (
+                    marker_positions[j]
+                    + marker_positions[j + 1]
+                ) / 2
+
+                boundaries.append(midpoint)
+
+            boundaries.append(chr_length)
+
+            # ---------------------------------
+            # Draw genotype segments
+            # ---------------------------------
+            for j, status in enumerate(calls):
+
+                start = boundaries[j]
+                end = boundaries[j + 1]
+
+                rect = patches.Rectangle(
+                    (start, y),
+                    end - start,
+                    row_height,
+                    facecolor=colors[status],
+                    edgecolor="none"
+                )
+
+                ax.add_patch(rect)
+
+        # -------------------------------------
+        # Axis formatting
+        # -------------------------------------
+        ax.set_xlim(0, chr_length)
+        ax.set_ylim(
+            y_positions[-1] + row_height,
+            -0.1
+        )
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        ax.set_title(
+            chrom,
+            fontsize=9,
+            fontweight="bold",
+            pad=8
+        )
+
+        # Remove axis borders
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        # Plant IDs only on first chromosome
+        if i == 0:
+
+            ax.set_yticks(
+                [
+                    y + row_height / 2
+                    for y in y_positions
+                ]
+            )
+
+            ax.set_yticklabels(
+                plant_order,
+                fontsize=8
+            )
+
+            ax.tick_params(
+                axis="y",
+                length=0,
+                pad=5
+            )
+
+    # -----------------------------------------
+    # Main title
+    # -----------------------------------------
+    fig.suptitle(
+        f"Visual Representation of Background Recovery ({rp} × {dp})",
+        fontsize=15,
+        fontweight="bold",
+        y=0.98
+    )
+
+    # -----------------------------------------
+    # Legend
+    # -----------------------------------------
+    legend_elements = [
+        Patch(facecolor=colors["RP"], edgecolor="black", label="RP"),
+        Patch(facecolor=colors["DP"], edgecolor="black", label="DP"),
+        Patch(facecolor=colors["HET"], edgecolor="black", label="HET"),
+        Patch(facecolor=colors["NA"], edgecolor="black", label="NA"),
+        Patch(facecolor=colors["MONO"], edgecolor="black", label="Monomorphic")
+    ]
+
+    fig.legend(
+        handles=legend_elements,
+        loc="lower center",
+        ncol=5,
+        frameon=False,
+        bbox_to_anchor=(0.5, 0.01)
+    )
+
+    plt.tight_layout(
+        rect=[0.08, 0.06, 1, 0.94]
+    )
+
     return fig

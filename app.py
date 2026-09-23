@@ -268,7 +268,7 @@ with tab2:
         st.download_button(
             "Download Polymorphic Markers (Excel)",
             buffer,
-            file_name=f"Polymorphic_markers_{rp}_{dp}.xlsx",
+            file_name="Polymorphic_markers_{rp}_{dp}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
@@ -278,75 +278,47 @@ with tab2:
         "View Chromosome-wise Marker Map"
     ):
 
-        # ---------------------------------------------
-        # Check SNP position file
-        # ---------------------------------------------
-        if (
-            "marker_df" not in st.session_state
-            or "chrom_df" not in st.session_state
-        ):
+        from analysis import get_marker_status_for_map, plot_chromosome_map
 
-            st.info(
-                "Upload SNP Marker Position File in Tab 1 "
-                "to continue"
-            )
+        marker_status = get_marker_status_for_map(
+            st.session_state["parent_df"],
+            rp,
+            dp
+        )
 
-        else:
+        fig = plot_chromosome_map(
+            marker_status,
+            st.session_state["marker_df"],
+            st.session_state["chrom_df"],
+            rp,
+            dp
+        )
 
-            from analysis import (
-                get_marker_status_for_map,
-                plot_chromosome_map
-            )
+        st.pyplot(fig)
 
-            marker_status = get_marker_status_for_map(
-                st.session_state["parent_df"],
-                rp,
-                dp
-            )
+        import io
 
-            fig = plot_chromosome_map(
-                marker_status,
-                st.session_state["marker_df"],
-                st.session_state["chrom_df"],
-                rp,
-                dp
-            )
+        png = io.BytesIO()
+        fig.savefig(png, format="png", dpi=300, bbox_inches="tight")
+        png.seek(0)
 
-            st.pyplot(fig)
+        jpg = io.BytesIO()
+        fig.savefig(jpg, format="jpg", dpi=300, bbox_inches="tight")
+        jpg.seek(0)
 
-            import io
+        st.download_button(
+            "Download Map (PNG)",
+            png,
+            file_name=f"Chr_Map_{rp}_{dp}.png",
+            mime="image/png"
+        )
 
-            png = io.BytesIO()
-            fig.savefig(
-                png,
-                format="png",
-                dpi=300,
-                bbox_inches="tight"
-            )
-            png.seek(0)
-
-            jpg = io.BytesIO()
-            fig.savefig(
-                jpg,
-                format="jpg",
-                dpi=300,
-                bbox_inches="tight"
-            )
-            jpg.seek(0)
-
-            st.download_button(
-                "Download Map (PNG)",
-                png,
-                file_name=f"Chr_Map_{rp}_{dp}.png",
-                mime="image/png"
-            )
-
-            st.download_button(
-                "Download Map (JPG)",
-                jpg,
-                file_name=f"Chr_Map_{rp}_{dp}.jpg",
-                mime="image/jpeg"
-            )
+        st.download_button(
+            "Download Map (JPG)",
+            jpg,
+            file_name=f"Chr_Map_{rp}_{dp}.jpg",
+            mime="image/jpeg"
+        )
 
 
 # =================================================
@@ -354,9 +326,12 @@ with tab2:
 # =================================================
 with tab3:
 
+    # =================================================
+    # UPLOAD BC GENOTYPING DATA
+    # =================================================
+
     st.subheader("Upload BC Genotyping Data")
 
-    
     file = st.file_uploader(
         "Upload BC Excel file",
         type="xlsx",
@@ -365,7 +340,6 @@ with tab3:
 
     if file is not None:
 
-        
         bc_df = pd.read_excel(
             file,
             keep_default_na=False
@@ -389,31 +363,28 @@ with tab3:
         st.success("BC genotyping data uploaded successfully.")
 
         st.info(f"""
-        
         Detected rows : {len(line_names)}
 
         Detected markers : {marker_count}
 
         Detected BC plants : {plant_count}
-        """
-        )
+        """)
 
-# =================================================
-# BG RECOVERY & RANKING
-# =================================================
 
-    # ---------------------------------------------
-    # INFO PANEL (OPTION 3 – SECTION PANEL)
-    # ---------------------------------------------
-    
+    # =================================================
+    # BG RECOVERY & RANKING
+    # =================================================
 
     st.subheader("BG Recovery & Ranking")
 
     if "bc_df" not in st.session_state:
+
         st.info("Upload a BC genotyping file to continue.")
+
         rp = None
         dp = None
         line_names = []
+
     else:
 
         bc_df = st.session_state["bc_df"]
@@ -439,13 +410,15 @@ with tab3:
             key="recovery_dp"
         )
 
-        # Remaining BG Recovery widgets...
 
-    
+    # =================================================
+    # MARKER INPUT
+    # =================================================
+
     if "bc_df" in st.session_state:
 
         st.caption(
-            f"BC plants available: {max(len(line_names)-2, 0)}"
+            f"BC plants available: {max(len(line_names) - 2, 0)}"
         )
 
         st.markdown("---")
@@ -465,31 +438,47 @@ with tab3:
             key="polymorphic_markers"
         )
 
-        monomorphic_markers = effective_markers - polymorphic_markers
+        monomorphic_markers = (
+            effective_markers - polymorphic_markers
+        )
 
         st.metric(
             "Monomorphic Markers",
             monomorphic_markers
-        )    
+        )
 
 
-    # ---------------------------------------------
-    # RUN ANALYSIS
-    # ---------------------------------------------
-    if "bc_df" in st.session_state and st.button("Analyze BG Recovery", key="recovery_btn"):
+    # =================================================
+    # RUN BG RECOVERY ANALYSIS
+    # =================================================
 
-        
-        if "bc_df" not in st.session_state:
-            st.error("Please upload BC genotyping data first")
-            st.stop()
-        
+    if (
+        "bc_df" in st.session_state
+        and st.button(
+            "Analyze BG Recovery",
+            key="recovery_btn"
+        )
+    ):
+
         if rp == dp:
-            st.error("Recurrent Parent and Donor Parent cannot be the same.")
+
+            st.error(
+                "Recurrent Parent and Donor Parent cannot be the same."
+            )
+
             st.stop()
 
         if effective_markers == 0:
-            st.error("Please enter the number of effective markers.")
+
+            st.error(
+                "Please enter the number of effective markers."
+            )
+
             st.stop()
+
+        # ---------------------------------------------
+        # Run analysis
+        # ---------------------------------------------
 
         res = analyze_bc(
             st.session_state["bc_df"],
@@ -499,86 +488,422 @@ with tab3:
             polymorphic_markers
         )
 
-        # -----------------------------------------
-        # OPTION 2: COLORED TABLE
-        # -----------------------------------------
+        # ---------------------------------------------
+        # Save results for persistence across reruns
+        # ---------------------------------------------
+
+        st.session_state["bg_recovery_results"] = res.copy()
+
+        st.session_state["bg_recovery_rp"] = rp
+
+        st.session_state["bg_recovery_dp"] = dp
+
+        # Reset old visualization when new analysis runs
+        st.session_state["show_visual_recovery"] = False
+
+
+    # =================================================
+    # DISPLAY BG RECOVERY RESULTS
+    # =================================================
+
+    if "bg_recovery_results" in st.session_state:
+
+        res = st.session_state["bg_recovery_results"]
+
+
+        # ---------------------------------------------
+        # Highlight Rank 1
+        # ---------------------------------------------
+
         def highlight_top_rank(row):
+
             if row["Rank"] == 1:
-                return ["background-color: #C8E6C9"] * len(row)
+
+                return (
+                    ["background-color: #C8E6C9"]
+                    * len(row)
+                )
+
             return [""] * len(row)
+
 
         styled_res = (
             res.style
-            .apply(highlight_top_rank, axis=1)
+            .apply(
+                highlight_top_rank,
+                axis=1
+            )
         )
 
-        st.dataframe(styled_res, use_container_width=True)
+        st.dataframe(
+            styled_res,
+            use_container_width=True
+        )
 
-        # -----------------------------------------
-        # OPTION 4: FORMATTED EXCEL OUTPUT
-        # -----------------------------------------
+
+        # =================================================
+        # EXCEL DOWNLOAD
+        # =================================================
+
         from io import BytesIO
+
         from openpyxl import load_workbook
-        from openpyxl.styles import Font, PatternFill
-        from openpyxl.utils import get_column_letter
+
+        from openpyxl.styles import (
+            Font,
+            PatternFill
+        )
+
+        from openpyxl.utils import (
+            get_column_letter
+        )
+
 
         excel_buffer = BytesIO()
+
         res.to_excel(
             excel_buffer,
             index=False,
             sheet_name="BC_Recovery"
         )
+
         excel_buffer.seek(0)
 
         wb = load_workbook(excel_buffer)
+
         ws = wb.active
 
-        # Bold header
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
 
-        # Auto column width
-        for col in ws.columns:
-            max_len = max(
-                len(str(cell.value)) if cell.value is not None else 0
-                for cell in col
+        # ---------------------------------------------
+        # Bold header
+        # ---------------------------------------------
+
+        for cell in ws[1]:
+
+            cell.font = Font(
+                bold=True
             )
+
+
+        # ---------------------------------------------
+        # Auto column width
+        # ---------------------------------------------
+
+        for col in ws.columns:
+
+            max_len = max(
+
+                len(str(cell.value))
+                if cell.value is not None
+                else 0
+
+                for cell in col
+
+            )
+
             ws.column_dimensions[
-                get_column_letter(col[0].column)
+                get_column_letter(
+                    col[0].column
+                )
             ].width = max_len + 2
 
-        # Highlight Rank = 1 rows
+
+        # ---------------------------------------------
+        # Highlight Rank = 1
+        # ---------------------------------------------
+
         green_fill = PatternFill(
+
             start_color="C8E6C9",
+
             end_color="C8E6C9",
+
             fill_type="solid"
+
         )
+
 
         rank_col_idx = None
-        for i, cell in enumerate(ws[1], start=1):
+
+
+        for i, cell in enumerate(
+            ws[1],
+            start=1
+        ):
+
             if cell.value == "Rank":
+
                 rank_col_idx = i
+
                 break
 
+
         if rank_col_idx:
-            for row in ws.iter_rows(min_row=2):
-                if row[rank_col_idx - 1].value == 1:
+
+            for row in ws.iter_rows(
+                min_row=2
+            ):
+
+                if row[
+                    rank_col_idx - 1
+                ].value == 1:
+
                     for cell in row:
+
                         cell.fill = green_fill
 
+
+        # ---------------------------------------------
+        # Save final Excel
+        # ---------------------------------------------
+
         final_buffer = BytesIO()
+
         wb.save(final_buffer)
+
         final_buffer.seek(0)
 
+
         st.download_button(
+
             label="Download BG Recovery (Excel)",
+
             data=final_buffer,
+
             file_name="BC_Recovery_Ranking.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+
             key="recovery_download"
+
         )
 
 
+    # =================================================
+    # VISUAL REPRESENTATION OF RECOVERY
+    # =================================================
+
+    st.markdown("---")
+
+    st.subheader(
+        "Visual Representation of Recovery"
+    )
+
+
+    # ---------------------------------------------
+    # Check if BG analysis is available
+    # ---------------------------------------------
+
+    if "bg_recovery_results" not in st.session_state:
+
+        st.info(
+            "Please run BG Recovery Analysis first "
+            "to generate the visual representation."
+        )
+
+
+    # ---------------------------------------------
+    # Check SNP position data
+    # ---------------------------------------------
+
+    elif (
+
+        "marker_df" not in st.session_state
+
+        or
+
+        "chrom_df" not in st.session_state
+
+    ):
+
+        st.warning(
+            "Please upload the SNP Position File in Tab 1 "
+            "to use Visual Representation of Recovery."
+        )
+
+
+    # ---------------------------------------------
+    # Visual recovery button
+    # ---------------------------------------------
+
+    else:
+
+        if st.button(
+
+            "View Visual Representation of Recovery",
+
+            key="visual_recovery_btn"
+
+        ):
+
+            st.session_state[
+                "show_visual_recovery"
+            ] = True
+
+
+        # ---------------------------------------------
+        # Generate visualization
+        # ---------------------------------------------
+
+        if st.session_state.get(
+
+            "show_visual_recovery",
+
+            False
+
+        ):
+
+            from analysis import (
+                plot_visual_recovery
+            )
+
+
+            try:
+
+                fig = plot_visual_recovery(
+
+                    st.session_state["bc_df"],
+
+                    st.session_state[
+                        "bg_recovery_rp"
+                    ],
+
+                    st.session_state[
+                        "bg_recovery_dp"
+                    ],
+
+                    st.session_state[
+                        "marker_df"
+                    ],
+
+                    st.session_state[
+                        "chrom_df"
+                    ],
+
+                    st.session_state[
+                        "bg_recovery_results"
+                    ]
+
+                )
+
+
+                # Display figure
+                st.pyplot(
+                    fig,
+                    use_container_width=True
+                )
+
+
+                # =================================================
+                # IMAGE DOWNLOAD
+                # =================================================
+
+                import io
+
+
+                # ---------------------------------------------
+                # PNG
+                # ---------------------------------------------
+
+                png = io.BytesIO()
+
+                fig.savefig(
+
+                    png,
+
+                    format="png",
+
+                    dpi=300,
+
+                    bbox_inches="tight"
+
+                )
+
+                png.seek(0)
+
+
+                # ---------------------------------------------
+                # JPG
+                # ---------------------------------------------
+
+                jpg = io.BytesIO()
+
+                fig.savefig(
+
+                    jpg,
+
+                    format="jpg",
+
+                    dpi=300,
+
+                    bbox_inches="tight"
+
+                )
+
+                jpg.seek(0)
+
+
+                rp_name = st.session_state[
+                    "bg_recovery_rp"
+                ]
+
+                dp_name = st.session_state[
+                    "bg_recovery_dp"
+                ]
+
+
+                # ---------------------------------------------
+                # Download PNG
+                # ---------------------------------------------
+
+                st.download_button(
+
+                    "Download Visual Recovery (PNG)",
+
+                    png,
+
+                    file_name=(
+                        f"Visual_Recovery_"
+                        f"{rp_name}_{dp_name}.png"
+                    ),
+
+                    mime="image/png",
+
+                    key="visual_recovery_png"
+
+                )
+
+
+                # ---------------------------------------------
+                # Download JPG
+                # ---------------------------------------------
+
+                st.download_button(
+
+                    "Download Visual Recovery (JPG)",
+
+                    jpg,
+
+                    file_name=(
+                        f"Visual_Recovery_"
+                        f"{rp_name}_{dp_name}.jpg"
+                    ),
+
+                    mime="image/jpeg",
+
+                    key="visual_recovery_jpg"
+
+                )
+
+
+            except Exception as e:
+
+                st.error(
+                    f"Unable to generate visual representation: {e}"
+                )
 # -------------------------------------------------
 # Footer
 # -------------------------------------------------
