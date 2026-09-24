@@ -138,6 +138,28 @@ def analyze_bc(
         else:
             K = F + (0.5 * H) + C
             rp_recovery = 0
+        
+        # -----------------------------------------
+        # RP% and DP% based on polymorphic markers
+        # -----------------------------------------
+
+        poly_total = len(poly_markers)
+
+        poly_valid = poly_total - I
+
+        if poly_valid > 0:
+            rp_percent = round(
+                ((F + (0.5 * H)) / poly_valid) * 100,
+                2
+            )
+
+            dp_percent = round(
+                ((G + (0.5 * H)) / poly_valid) * 100,
+                2
+            )
+        else:
+            rp_percent = 0
+            dp_percent = 0
 
         results.append({
             "Plant": plant,
@@ -145,6 +167,8 @@ def analyze_bc(
             "HET": H,
             "DP": G,
             "NA": I,
+            "RP_%": rp_percent,
+            "DP_%": dp_percent,
             "Recovered": K,
             "Total_markers": J,
             "Recovery_%": rp_recovery
@@ -177,7 +201,9 @@ def analyze_bc(
         "DP": "DP",
         "HET": "HET",
         "NA": "NA",
-        "Recovery_%": "BG Recovery %",
+        "RP_%": "RP %",
+        "DP_%": "DP %",
+        "Recovery_%": "Overall BG Recovery %",
         "Rank": "Rank"
     }
 
@@ -743,7 +769,7 @@ def plot_visual_recovery(
         len(chromosomes),
         figure=fig,
         width_ratios=chromosome_lengths,
-        wspace=0.03
+        wspace=0.08
     )
 
     axes = []
