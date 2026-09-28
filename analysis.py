@@ -900,7 +900,7 @@ def plot_visual_recovery(
 
         ax.set_title(
             chrom,
-            fontsize=9,
+            fontsize=12,
             fontweight="bold",
             pad=8
         )
