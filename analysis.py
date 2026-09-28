@@ -900,7 +900,7 @@ def plot_visual_recovery(
 
         ax.set_title(
             chrom,
-            fontsize=12,
+            fontsize=9,
             fontweight="bold",
             pad=8
         )
@@ -921,7 +921,7 @@ def plot_visual_recovery(
 
             ax.set_yticklabels(
                 plant_order,
-                fontsize=8
+                fontsize=10
             )
 
             ax.tick_params(
